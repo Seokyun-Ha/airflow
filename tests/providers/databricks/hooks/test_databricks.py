@@ -36,6 +36,7 @@ from airflow.providers.databricks.hooks.databricks import (
     SUBMIT_RUN_ENDPOINT,
     DatabricksHook,
     RunState,
+    ClusterState
 )
 from airflow.providers.databricks.hooks.databricks_base import (
     AZURE_DEFAULT_AD_ENDPOINT,
@@ -178,6 +179,13 @@ def terminate_cluster_endpoint(host):
     Utility function to generate the get run endpoint given the host.
     """
     return f"https://{host}/api/2.0/clusters/delete"
+
+
+def get_cluster_endpoint(host):
+    """
+    Utility function to generate the get run endpoint given the host.
+    """
+    return f"https://{host}/api/2.0/clusters/get"
 
 
 def install_endpoint(host):
@@ -964,6 +972,52 @@ class TestRunState:
     def test_from_json(self):
         state = {"life_cycle_state": "TERMINATED", "result_state": "SUCCESS", "state_message": ""}
         expected = RunState("TERMINATED", "SUCCESS", "")
+        assert expected == RunState.from_json(json.dumps(state))
+
+
+class TestClusterState:
+    """
+    Tests for ClusterState.
+    """
+    def test_is_terminal_true(self):
+        terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
+        for state in terminal_states:
+            cluster_state = ClusterState(state, "")
+            assert cluster_state.is_terminal
+
+    def test_is_terminal_false(self):
+        non_terminal_states = ["PENDING", "RUNNING", "RESTARTING", "RESIZING"]
+        for state in non_terminal_states:
+            cluster_state = ClusterState(state, "")
+            assert not cluster_state.is_terminal
+
+    def test_is_terminal_with_nonexistent_life_cycle_state(self):
+        cluster_state = ClusterState("blah", "")
+        with pytest.raises(AirflowException):
+            assert cluster_state.is_terminal
+
+    def test_is_running(self):
+        running_states = ["RUNNING", "RESIZING"]
+        for state in running_states:
+            cluster_state = ClusterState(state, "")
+            assert cluster_state.is_running
+
+    def test_to_json(self):
+        """
+        example from https://docs.databricks.com/api/workspace/clusters/get
+        """
+        cluster_state = ClusterState("TERMINATED",
+                                     "Inactive cluster terminated (inactive for 120 minutes).")
+        expected = json.dumps(
+            {"state": "TERMINATED",
+             "state_message": "Inactive cluster terminated (inactive for 120 minutes)."}
+        )
+        assert expected == cluster_state.to_json()
+
+    def test_from_json(self):
+        state = {"state": "TERMINATED",
+                 "state_message": "Inactive cluster terminated (inactive for 120 minutes)."}
+        expected = RunState("TERMINATED", "Inactive cluster terminated (inactive for 120 minutes).")
         assert expected == RunState.from_json(json.dumps(state))
 
 
