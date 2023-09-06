@@ -1304,7 +1304,7 @@ class TestDatabricksHookAsyncMethods:
     async def test_get_run_page_url(self, mock_get):
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
         async with self.hook:
-            run_page_url = await self.hook.a_get_run_page_url(RUN_ID)
+            run_page_url = await self.hook.async_get_run_page_url(RUN_ID)
 
         assert run_page_url == RUN_PAGE_URL
         mock_get.assert_called_once_with(
@@ -1321,7 +1321,7 @@ class TestDatabricksHookAsyncMethods:
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
         mock_get.assert_called_once_with(
@@ -1363,7 +1363,7 @@ class TestDatabricksHookAsyncAadToken:
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
         mock_get.assert_called_once_with(
@@ -1409,7 +1409,7 @@ class TestDatabricksHookAsyncAadTokenOtherClouds:
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
 
@@ -1462,7 +1462,7 @@ class TestDatabricksHookAsyncAadTokenSpOutside:
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
 
@@ -1524,7 +1524,7 @@ class TestDatabricksHookAsyncAadTokenManagedIdentity:
         )
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
 
@@ -1603,7 +1603,7 @@ class TestDatabricksHookAsyncSpToken:
         mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_RUN_RESPONSE)
 
         async with self.hook:
-            run_state = await self.hook.a_get_run_state(RUN_ID)
+            run_state = await self.hook.async_get_run_state(RUN_ID)
 
         assert run_state == RunState(LIFE_CYCLE_STATE, RESULT_STATE, STATE_MESSAGE)
         mock_get.assert_called_once_with(
