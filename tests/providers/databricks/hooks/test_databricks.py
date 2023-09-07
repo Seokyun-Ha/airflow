@@ -651,6 +651,68 @@ class TestDatabricksHook:
         )
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
+    def test_activate_cluster_with_running_state(self, mock_requests):
+        running_states = ["RUNNING", "RESIZING"]
+        json = {"cluster_id": CLUSTER_ID}
+        for state in running_states:
+            mock_requests.codes.ok = 200
+            mock_requests.get.return_value.json.return_value = {
+                "state": state,
+                "state_message": CLUSTER_STATE_MESSAGE
+            }
+            self.hook.activate_cluster(json=json,
+                                       polling=30,
+                                       timeout=30)
+            mock_requests.get.assert_called_once_with(
+                get_cluster_endpoint(HOST),
+                json={"cluster_id": CLUSTER_ID},
+                params=None,
+                auth=HTTPBasicAuth(LOGIN, PASSWORD),
+                headers=self.hook.user_agent_header,
+                timeout=self.hook.timeout_seconds,
+            )
+            mock_requests.get.reset_mock()
+
+    @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
+    def test_activate_cluster_with_terminal_state(self, mock_requests):
+        RUNNING_STATE = "RUNNING"
+        terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
+        json = {"cluster_id": CLUSTER_ID}
+        for state in terminal_states:
+            side_effect = [
+                {"state": state, "state_message": CLUSTER_STATE_MESSAGE},
+                {"state": RUNNING_STATE, "state_message": CLUSTER_STATE_MESSAGE}
+            ]
+            mock_requests.codes.ok = 200
+            mock_requests.get.return_value.json.side_effect = side_effect
+            mock_requests.post.return_value.json.return_value = {}
+            status_code_mock = mock.PropertyMock(return_value=200)
+            type(mock_requests.post.return_value).status_code = status_code_mock
+
+            self.hook.activate_cluster(json=json,
+                                       polling=30,
+                                       timeout=30)
+
+            assert mock_requests.get.call_count == 2
+            mock_requests.get.assert_any_call(
+                get_cluster_endpoint(HOST),
+                json={"cluster_id": CLUSTER_ID},
+                params=None,
+                auth=HTTPBasicAuth(LOGIN, PASSWORD),
+                headers=self.hook.user_agent_header,
+                timeout=self.hook.timeout_seconds,
+            )
+            mock_requests.post.assert_called_once_with(
+                start_cluster_endpoint(HOST),
+                json={"cluster_id": CLUSTER_ID},
+                params=None,
+                auth=HTTPBasicAuth(LOGIN, PASSWORD),
+                headers=self.hook.user_agent_header,
+                timeout=self.hook.timeout_seconds,
+            )
+            mock_requests.get.reset_mock()
+
+    @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_restart_cluster(self, mock_requests):
         mock_requests.codes.ok = 200
         mock_requests.post.return_value.json.return_value = {}
