@@ -660,9 +660,7 @@ class TestDatabricksHook:
                 "state": state,
                 "state_message": ""
             }
-            self.hook.activate_cluster(json=json,
-                                       polling=5,
-                                       timeout=60)
+            self.hook.activate_cluster(json=json, polling=5, timeout=60)
             mock_requests.get.assert_called_once_with(
                 get_cluster_endpoint(HOST),
                 json={"cluster_id": CLUSTER_ID},
@@ -688,9 +686,7 @@ class TestDatabricksHook:
             status_code_mock = mock.PropertyMock(return_value=200)
             type(mock_requests.post.return_value).status_code = status_code_mock
 
-            self.hook.activate_cluster(json=json,
-                                       polling=5,
-                                       timeout=60)
+            self.hook.activate_cluster(json=json, polling=5, timeout=60)
 
             assert mock_requests.get.call_count == 2
             mock_requests.get.assert_any_call(
