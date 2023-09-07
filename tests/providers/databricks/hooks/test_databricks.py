@@ -1097,8 +1097,7 @@ class TestClusterState:
 
     def test_from_json(self):
         state = GET_CLUSTER_RESPONSE
-        expected = ClusterState(CLUSTER_STATE,
-                            CLUSTER_STATE_MESSAGE)
+        expected = ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
         assert expected == ClusterState.from_json(json.dumps(state))
 
 
