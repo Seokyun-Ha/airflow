@@ -79,6 +79,10 @@ GET_RUN_RESPONSE = {
     "state": {"life_cycle_state": LIFE_CYCLE_STATE, "state_message": STATE_MESSAGE},
 }
 GET_RUN_OUTPUT_RESPONSE = {"metadata": {}, "error": ERROR_MESSAGE, "notebook_output": {}}
+GET_CLUSTER_RESPONSE = {
+    "state": "TERMINATED",
+    "state_message": "Inactive cluster terminated (inactive for 120 minutes)."
+}
 NOTEBOOK_PARAMS = {"dry-run": "true", "oldest-time-to-consider": "1457570074236"}
 JAR_PARAMS = ["param1", "param2"]
 RESULT_STATE = ""
@@ -612,10 +616,7 @@ class TestDatabricksHook:
         Response example from https://docs.databricks.com/api/workspace/clusters/get
         """
         mock_requests.codes.ok = 200
-        mock_requests.get.return_value.json.return_value = {
-            "state": "TERMINATED",
-            "state_message": "Inactive cluster terminated (inactive for 120 minutes)."
-        }
+        mock_requests.get.return_value.json.return_value = GET_CLUSTER_RESPONSE
 
         cluster_state = self.hook.get_cluster_state(CLUSTER_ID)
 
@@ -627,8 +628,8 @@ class TestDatabricksHook:
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
         )
-        assert cluster_state.state == "TERMINATED"
-        assert cluster_state.state_message == "Inactive cluster terminated (inactive for 120 minutes)."
+        assert cluster_state.state == GET_CLUSTER_RESPONSE["state"]
+        assert cluster_state.state_message == GET_CLUSTER_RESPONSE["state_message"]
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_start_cluster(self, mock_requests):
@@ -1030,19 +1031,16 @@ class TestClusterState:
         """
         Response example from https://docs.databricks.com/api/workspace/clusters/get
         """
-        cluster_state = ClusterState("TERMINATED",
-                                     "Inactive cluster terminated (inactive for 120 minutes).")
-        expected = json.dumps(
-            {"state": "TERMINATED",
-             "state_message": "Inactive cluster terminated (inactive for 120 minutes)."}
-        )
+        cluster_state = ClusterState(GET_CLUSTER_RESPONSE["state"],
+                                     GET_CLUSTER_RESPONSE["state_message"])
+        expected = json.dumps(GET_CLUSTER_RESPONSE)
         assert expected == cluster_state.to_json()
 
     def test_from_json(self):
-        state = {"state": "TERMINATED",
-                 "state_message": "Inactive cluster terminated (inactive for 120 minutes)."}
-        expected = RunState("TERMINATED", "Inactive cluster terminated (inactive for 120 minutes).")
-        assert expected == RunState.from_json(json.dumps(state))
+        state = GET_CLUSTER_RESPONSE
+        expected = ClusterState(GET_CLUSTER_RESPONSE["state"],
+                            GET_CLUSTER_RESPONSE["state_message"])
+        assert expected == ClusterState.from_json(json.dumps(state))
 
 
 def create_aad_token_for_resource(resource: str) -> dict:
