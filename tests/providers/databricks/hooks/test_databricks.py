@@ -607,6 +607,30 @@ class TestDatabricksHook:
         )
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
+    def test_get_cluster_state(self, mock_requests):
+        """
+        Response example from https://docs.databricks.com/api/workspace/clusters/get
+        """
+        mock_requests.codes.ok = 200
+        mock_requests.get.return_value.json.return_value = {
+            "state": "TERMINATED",
+            "state_message": "Inactive cluster terminated (inactive for 120 minutes)."
+        }
+
+        cluster_state = self.hook.get_cluster_state(CLUSTER_ID)
+
+        mock_requests.get.assert_called_once_with(
+            get_cluster_endpoint(HOST),
+            json={"cluster_id": CLUSTER_ID},
+            params=None,
+            auth=HTTPBasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
+        assert cluster_state.state == "TERMINATED"
+        assert cluster_state.state_message == "Inactive cluster terminated (inactive for 120 minutes)."
+
+    @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_start_cluster(self, mock_requests):
         mock_requests.codes.ok = 200
         mock_requests.post.return_value.json.return_value = {}
@@ -1004,7 +1028,7 @@ class TestClusterState:
 
     def test_to_json(self):
         """
-        example from https://docs.databricks.com/api/workspace/clusters/get
+        Response example from https://docs.databricks.com/api/workspace/clusters/get
         """
         cluster_state = ClusterState("TERMINATED",
                                      "Inactive cluster terminated (inactive for 120 minutes).")
