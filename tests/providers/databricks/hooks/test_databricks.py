@@ -658,7 +658,7 @@ class TestDatabricksHook:
             mock_requests.codes.ok = 200
             mock_requests.get.return_value.json.return_value = {
                 "state": state,
-                "state_message": CLUSTER_STATE_MESSAGE
+                "state_message": ""
             }
             self.hook.activate_cluster(json=json,
                                        polling=30,
@@ -675,16 +675,15 @@ class TestDatabricksHook:
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_activate_cluster_with_terminal_state(self, mock_requests):
-        RUNNING_STATE = "RUNNING"
         terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
         json = {"cluster_id": CLUSTER_ID}
         for state in terminal_states:
             side_effect = [
-                {"state": state, "state_message": CLUSTER_STATE_MESSAGE},
-                {"state": RUNNING_STATE, "state_message": CLUSTER_STATE_MESSAGE}
+                {"state": state, "state_message": ""},
+                {"state": "RUNNING", "state_message": ""}
             ]
             mock_requests.codes.ok = 200
-            mock_requests.get.return_value.json.side_effect = side_effect
+            mock_requests.get.side_effect = side_effect
             mock_requests.post.return_value.json.return_value = {}
             status_code_mock = mock.PropertyMock(return_value=200)
             type(mock_requests.post.return_value).status_code = status_code_mock
@@ -711,6 +710,7 @@ class TestDatabricksHook:
                 timeout=self.hook.timeout_seconds,
             )
             mock_requests.get.reset_mock()
+            mock_requests.post.reset_mock()
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_restart_cluster(self, mock_requests):
@@ -1091,11 +1091,7 @@ class TestClusterState:
             assert cluster_state.is_running
 
     def test_to_json(self):
-        """
-        Response example from https://docs.databricks.com/api/workspace/clusters/get
-        """
-        cluster_state = ClusterState(CLUSTER_STATE,
-                                     CLUSTER_STATE_MESSAGE)
+        cluster_state = ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
         expected = json.dumps(GET_CLUSTER_RESPONSE)
         assert expected == cluster_state.to_json()
 
