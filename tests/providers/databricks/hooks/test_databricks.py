@@ -79,9 +79,11 @@ GET_RUN_RESPONSE = {
     "state": {"life_cycle_state": LIFE_CYCLE_STATE, "state_message": STATE_MESSAGE},
 }
 GET_RUN_OUTPUT_RESPONSE = {"metadata": {}, "error": ERROR_MESSAGE, "notebook_output": {}}
+CLUSTER_STATE = "TERMINATED"
+CLUSTER_STATE_MESSAGE = "Inactive cluster terminated (inactive for 120 minutes)."
 GET_CLUSTER_RESPONSE = {
-    "state": "TERMINATED",
-    "state_message": "Inactive cluster terminated (inactive for 120 minutes)."
+    "state": CLUSTER_STATE,
+    "state_message": CLUSTER_STATE_MESSAGE
 }
 NOTEBOOK_PARAMS = {"dry-run": "true", "oldest-time-to-consider": "1457570074236"}
 JAR_PARAMS = ["param1", "param2"]
@@ -620,6 +622,7 @@ class TestDatabricksHook:
 
         cluster_state = self.hook.get_cluster_state(CLUSTER_ID)
 
+        assert cluster_state == ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
         mock_requests.get.assert_called_once_with(
             get_cluster_endpoint(HOST),
             json={"cluster_id": CLUSTER_ID},
@@ -628,8 +631,6 @@ class TestDatabricksHook:
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
         )
-        assert cluster_state.state == GET_CLUSTER_RESPONSE["state"]
-        assert cluster_state.state_message == GET_CLUSTER_RESPONSE["state_message"]
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_start_cluster(self, mock_requests):
@@ -1031,15 +1032,15 @@ class TestClusterState:
         """
         Response example from https://docs.databricks.com/api/workspace/clusters/get
         """
-        cluster_state = ClusterState(GET_CLUSTER_RESPONSE["state"],
-                                     GET_CLUSTER_RESPONSE["state_message"])
+        cluster_state = ClusterState(CLUSTER_STATE,
+                                     CLUSTER_STATE_MESSAGE)
         expected = json.dumps(GET_CLUSTER_RESPONSE)
         assert expected == cluster_state.to_json()
 
     def test_from_json(self):
         state = GET_CLUSTER_RESPONSE
-        expected = ClusterState(GET_CLUSTER_RESPONSE["state"],
-                            GET_CLUSTER_RESPONSE["state_message"])
+        expected = ClusterState(CLUSTER_STATE,
+                            CLUSTER_STATE_MESSAGE)
         assert expected == ClusterState.from_json(json.dumps(state))
 
 
@@ -1349,6 +1350,23 @@ class TestDatabricksHookAsyncMethods:
         mock_get.assert_called_once_with(
             get_run_endpoint(HOST),
             json={"run_id": RUN_ID},
+            auth=aiohttp.BasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
+
+    @pytest.mark.asyncio
+    @mock.patch("airflow.providers.databricks.hooks.databricks_base.aiohttp.ClientSession.get")
+    async def test_get_cluster_state(self, mock_get):
+        mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_CLUSTER_RESPONSE)
+
+        async with self.hook:
+            cluster_state = await self.hook.async_get_cluster_state(CLUSTER_ID)
+
+        assert cluster_state == ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
+        mock_get.assert_called_once_with(
+            get_cluster_endpoint(HOST),
+            json={"cluster_id": CLUSTER_ID},
             auth=aiohttp.BasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
