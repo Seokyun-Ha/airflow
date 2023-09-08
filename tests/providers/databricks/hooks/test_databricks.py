@@ -1029,8 +1029,8 @@ class TestRunState:
             assert not run_state.is_terminal
 
     def test_is_terminal_with_nonexistent_life_cycle_state(self):
-        run_state = RunState("blah", "", "")
         with pytest.raises(AirflowException):
+            run_state = RunState("blah", "", "")
             assert run_state.is_terminal
 
     def test_is_successful(self):
@@ -1064,8 +1064,8 @@ class TestClusterState:
             assert not cluster_state.is_terminal
 
     def test_is_terminal_with_nonexistent_life_cycle_state(self):
-        cluster_state = ClusterState("blah", "")
         with pytest.raises(AirflowException):
+            cluster_state = ClusterState("blah", "")
             assert cluster_state.is_terminal
 
     def test_is_running(self):
