@@ -36,7 +36,7 @@ from airflow.providers.databricks.hooks.databricks import (
     SUBMIT_RUN_ENDPOINT,
     ClusterState,
     DatabricksHook,
-    RunState
+    RunState,
 )
 from airflow.providers.databricks.hooks.databricks_base import (
     AZURE_DEFAULT_AD_ENDPOINT,
@@ -1051,9 +1051,6 @@ class TestRunState:
 
 
 class TestClusterState:
-    """
-    Tests for ClusterState.
-    """
     def test_is_terminal_true(self):
         terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
         for state in terminal_states:
