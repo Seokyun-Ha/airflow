@@ -22,7 +22,6 @@ import os
 import shutil
 import sys
 from copy import copy
-from tempfile import NamedTemporaryFile
 from unittest import mock
 from unittest.mock import ANY, MagicMock
 from uuid import uuid4
@@ -33,7 +32,6 @@ from kubernetes import client
 from kubernetes.client import V1EnvVar, V1PodSecurityContext, V1SecurityContext, models as k8s
 from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
-from pytest import param
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models import DAG, Connection, DagRun, TaskInstance
@@ -150,9 +148,8 @@ class TestKubernetesPodOperatorSystem:
             return None
         return ",".join([f"{key}={value}" for key, value in enumerate(self.labels)])
 
-    def test_do_xcom_push_defaults_false(self, kubeconfig_path, mock_get_connection):
-        with NamedTemporaryFile(prefix="kube_config", suffix=".cfg") as f:
-            new_config_path = f.name
+    def test_do_xcom_push_defaults_false(self, kubeconfig_path, mock_get_connection, tmp_path):
+        new_config_path = tmp_path / "kube_config.cfg"
         shutil.copy(kubeconfig_path, new_config_path)
         k = KubernetesPodOperator(
             namespace="default",
@@ -163,13 +160,12 @@ class TestKubernetesPodOperatorSystem:
             task_id=str(uuid4()),
             in_cluster=False,
             do_xcom_push=False,
-            config_file=new_config_path,
+            config_file=os.fspath(new_config_path),
         )
         assert not k.do_xcom_push
 
-    def test_config_path_move(self, kubeconfig_path, mock_get_connection):
-        with NamedTemporaryFile(prefix="kube_config", suffix=".cfg") as f:
-            new_config_path = f.name
+    def test_config_path_move(self, kubeconfig_path, mock_get_connection, tmp_path):
+        new_config_path = tmp_path / "kube_config.cfg"
         shutil.copy(kubeconfig_path, new_config_path)
 
         k = KubernetesPodOperator(
@@ -182,7 +178,7 @@ class TestKubernetesPodOperatorSystem:
             in_cluster=False,
             do_xcom_push=False,
             is_delete_operator_pod=False,
-            config_file=new_config_path,
+            config_file=os.fspath(new_config_path),
         )
         context = create_context(k)
         k.execute(context)
@@ -395,7 +391,7 @@ class TestKubernetesPodOperatorSystem:
     @pytest.mark.parametrize(
         "val",
         [
-            param(
+            pytest.param(
                 k8s.V1Affinity(
                     node_affinity=k8s.V1NodeAffinity(
                         required_during_scheduling_ignored_during_execution=k8s.V1NodeSelector(
@@ -415,7 +411,7 @@ class TestKubernetesPodOperatorSystem:
                 ),
                 id="current",
             ),
-            param(
+            pytest.param(
                 {
                     "nodeAffinity": {
                         "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -729,8 +725,8 @@ class TestKubernetesPodOperatorSystem:
     @pytest.mark.parametrize(
         "env_vars",
         [
-            param([k8s.V1EnvVar(name="env_name", value="value")], id="current"),
-            param({"env_name": "value"}, id="backcompat"),  # todo: remove?
+            pytest.param([k8s.V1EnvVar(name="env_name", value="value")], id="current"),
+            pytest.param({"env_name": "value"}, id="backcompat"),  # todo: remove?
         ],
     )
     def test_pod_template_file_with_overrides_system(self, env_vars, test_label, mock_get_connection):
@@ -1210,6 +1206,24 @@ class TestKubernetesPodOperatorSystem:
         actual_pod = self.api_client.sanitize_for_serialization(k.pod)
         self.expected_pod["spec"]["containers"][0]["name"] = "apple-sauce"
         assert self.expected_pod["spec"] == actual_pod["spec"]
+
+    def test_progess_call(self, mock_get_connection):
+        progress_callback = MagicMock()
+        k = KubernetesPodOperator(
+            namespace="default",
+            image="ubuntu:16.04",
+            cmds=["bash", "-cx"],
+            arguments=["echo 10"],
+            labels=self.labels,
+            task_id=str(uuid4()),
+            in_cluster=False,
+            do_xcom_push=False,
+            get_logs=True,
+            progress_callback=progress_callback,
+        )
+        context = create_context(k)
+        k.execute(context)
+        progress_callback.assert_called()
 
     def test_changing_base_container_name_no_logs(self, mock_get_connection):
         """

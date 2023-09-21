@@ -379,6 +379,8 @@ DataScan
 dataScans
 Dataset
 dataset
+DatasetEvent
+DatasetEvents
 datasetId
 Datasets
 datasets
@@ -1072,6 +1074,7 @@ oversubscription
 PaaS
 Pagerduty
 pagerduty
+PagerdutyEventsHook
 pageviews
 paginator
 Papermill
@@ -1577,6 +1580,7 @@ tzinfo
 UA
 ui
 uid
+ulimit
 Umask
 umask
 Un

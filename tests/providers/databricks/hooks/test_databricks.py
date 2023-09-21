@@ -647,57 +647,52 @@ class TestDatabricksHook:
             timeout=self.hook.timeout_seconds,
         )
 
+    @pytest.mark.parametrize("running_state", ("RUNNING", "RESIZING"))
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
-    def test_activate_cluster_with_running_state(self, mock_requests):
-        running_states = ["RUNNING", "RESIZING"]
+    def test_activate_cluster_with_running_state(self, mock_requests, running_state):
         json = {"cluster_id": CLUSTER_ID}
-        for state in running_states:
-            mock_requests.codes.ok = 200
-            mock_requests.get.return_value.json.return_value = {"state": state, "state_message": ""}
-            self.hook.activate_cluster(json=json, polling=5, timeout=60)
-            mock_requests.get.assert_called_once_with(
-                get_cluster_endpoint(HOST),
-                json=None,
-                params={"cluster_id": CLUSTER_ID},
-                auth=HTTPBasicAuth(LOGIN, PASSWORD),
-                headers=self.hook.user_agent_header,
-                timeout=self.hook.timeout_seconds,
-            )
-            mock_requests.get.reset_mock()
+        mock_requests.codes.ok = 200
+        mock_requests.get.return_value.json.return_value = {"state": running_state, "state_message": ""}
+        self.hook.activate_cluster(json=json, polling=5, timeout=60)
+        mock_requests.get.assert_called_once_with(
+            get_cluster_endpoint(HOST),
+            json=None,
+            params={"cluster_id": CLUSTER_ID},
+            auth=HTTPBasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
 
+    @pytest.mark.parametrize("terminal_state", ("TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"))
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
-    def test_activate_cluster_with_terminal_state(self, mock_requests):
-        terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
+    def test_activate_cluster_with_terminal_state(self, mock_requests, terminal_state):
         json = {"cluster_id": CLUSTER_ID}
-        for state in terminal_states:
-            side_effect = [{"state": state, "state_message": ""}, {"state": "RUNNING", "state_message": ""}]
-            mock_requests.codes.ok = 200
-            mock_requests.get.return_value.json.side_effect = side_effect
-            mock_requests.post.return_value.json.return_value = {}
-            status_code_mock = mock.PropertyMock(return_value=200)
-            type(mock_requests.post.return_value).status_code = status_code_mock
+        side_effect = [{"state": terminal_state, "state_message": ""}, {"state": "RUNNING", "state_message": ""}]
+        mock_requests.codes.ok = 200
+        mock_requests.get.return_value.json.side_effect = side_effect
+        mock_requests.post.return_value.json.return_value = {}
+        status_code_mock = mock.PropertyMock(return_value=200)
+        type(mock_requests.post.return_value).status_code = status_code_mock
 
-            self.hook.activate_cluster(json=json, polling=5, timeout=60)
+        self.hook.activate_cluster(json=json, polling=5, timeout=60)
 
-            assert mock_requests.get.call_count == 2
-            mock_requests.get.assert_any_call(
-                get_cluster_endpoint(HOST),
-                json=None,
-                params={"cluster_id": CLUSTER_ID},
-                auth=HTTPBasicAuth(LOGIN, PASSWORD),
-                headers=self.hook.user_agent_header,
-                timeout=self.hook.timeout_seconds,
-            )
-            mock_requests.post.assert_called_once_with(
-                start_cluster_endpoint(HOST),
-                json={"cluster_id": CLUSTER_ID},
-                params=None,
-                auth=HTTPBasicAuth(LOGIN, PASSWORD),
-                headers=self.hook.user_agent_header,
-                timeout=self.hook.timeout_seconds,
-            )
-            mock_requests.get.reset_mock()
-            mock_requests.post.reset_mock()
+        assert mock_requests.get.call_count == 2
+        mock_requests.get.assert_any_call(
+            get_cluster_endpoint(HOST),
+            json=None,
+            params={"cluster_id": CLUSTER_ID},
+            auth=HTTPBasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
+        mock_requests.post.assert_called_once_with(
+            start_cluster_endpoint(HOST),
+            json={"cluster_id": CLUSTER_ID},
+            params=None,
+            auth=HTTPBasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
 
     @mock.patch("airflow.providers.databricks.hooks.databricks_base.requests")
     def test_restart_cluster(self, mock_requests):
@@ -820,7 +815,7 @@ class TestDatabricksHook:
         mock_requests.get.assert_called_once_with(
             list_jobs_endpoint(HOST),
             json=None,
-            params={"limit": 25, "offset": 0, "expand_tasks": False},
+            params={"limit": 25, "page_token": "", "expand_tasks": False},
             auth=HTTPBasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
@@ -832,7 +827,9 @@ class TestDatabricksHook:
     def test_list_jobs_success_multiple_pages(self, mock_requests):
         mock_requests.codes.ok = 200
         mock_requests.get.side_effect = [
-            create_successful_response_mock({**LIST_JOBS_RESPONSE, "has_more": True}),
+            create_successful_response_mock(
+                {**LIST_JOBS_RESPONSE, "has_more": True, "next_page_token": "PAGETOKEN"}
+            ),
             create_successful_response_mock(LIST_JOBS_RESPONSE),
         ]
 
@@ -842,11 +839,15 @@ class TestDatabricksHook:
 
         first_call_args = mock_requests.method_calls[0]
         assert first_call_args[1][0] == list_jobs_endpoint(HOST)
-        assert first_call_args[2]["params"] == {"limit": 25, "offset": 0, "expand_tasks": False}
+        assert first_call_args[2]["params"] == {"limit": 25, "page_token": "", "expand_tasks": False}
 
         second_call_args = mock_requests.method_calls[1]
         assert second_call_args[1][0] == list_jobs_endpoint(HOST)
-        assert second_call_args[2]["params"] == {"limit": 25, "offset": 1, "expand_tasks": False}
+        assert second_call_args[2]["params"] == {
+            "limit": 25,
+            "page_token": "PAGETOKEN",
+            "expand_tasks": False,
+        }
 
         assert len(jobs) == 2
         assert jobs == LIST_JOBS_RESPONSE["jobs"] * 2
@@ -861,7 +862,7 @@ class TestDatabricksHook:
         mock_requests.get.assert_called_once_with(
             list_jobs_endpoint(HOST),
             json=None,
-            params={"limit": 25, "offset": 0, "expand_tasks": False, "name": JOB_NAME},
+            params={"limit": 25, "page_token": "", "expand_tasks": False, "name": JOB_NAME},
             auth=HTTPBasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
@@ -880,7 +881,7 @@ class TestDatabricksHook:
         mock_requests.get.assert_called_once_with(
             list_jobs_endpoint(HOST),
             json=None,
-            params={"limit": 25, "offset": 0, "expand_tasks": False, "name": job_name},
+            params={"limit": 25, "page_token": "", "expand_tasks": False, "name": job_name},
             auth=HTTPBasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
@@ -903,7 +904,7 @@ class TestDatabricksHook:
         mock_requests.get.assert_called_once_with(
             list_jobs_endpoint(HOST),
             json=None,
-            params={"limit": 25, "offset": 0, "expand_tasks": False, "name": JOB_NAME},
+            params={"limit": 25, "page_token": "", "expand_tasks": False, "name": JOB_NAME},
             auth=HTTPBasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
