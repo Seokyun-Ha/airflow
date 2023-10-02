@@ -162,11 +162,13 @@ def repair_run_endpoint(host):
     """
     return f"https://{host}/api/2.1/jobs/runs/repair"
 
+
 def get_cluster_endpoint(host):
     """
     Utility function to generate the get run endpoint given the host.
     """
     return f"https://{host}/api/2.0/clusters/get"
+
 
 def start_cluster_endpoint(host):
     """
@@ -981,8 +983,8 @@ class TestRunState:
             assert not run_state.is_terminal
 
     def test_is_terminal_with_nonexistent_life_cycle_state(self):
-        run_state = RunState("blah", "", "")
         with pytest.raises(AirflowException):
+            run_state = RunState("blah", "", "")
             assert run_state.is_terminal
 
     def test_is_successful(self):
@@ -1000,6 +1002,41 @@ class TestRunState:
         state = {"life_cycle_state": "TERMINATED", "result_state": "SUCCESS", "state_message": ""}
         expected = RunState("TERMINATED", "SUCCESS", "")
         assert expected == RunState.from_json(json.dumps(state))
+
+
+class TestClusterState:
+    def test_is_terminal_true(self):
+        terminal_states = ["TERMINATING", "TERMINATED", "ERROR", "UNKNOWN"]
+        for state in terminal_states:
+            cluster_state = ClusterState(state, "")
+            assert cluster_state.is_terminal
+
+    def test_is_terminal_false(self):
+        non_terminal_states = ["PENDING", "RUNNING", "RESTARTING", "RESIZING"]
+        for state in non_terminal_states:
+            cluster_state = ClusterState(state, "")
+            assert not cluster_state.is_terminal
+
+    def test_is_terminal_with_nonexistent_life_cycle_state(self):
+        with pytest.raises(AirflowException):
+            cluster_state = ClusterState("blah", "")
+            assert cluster_state.is_terminal
+
+    def test_is_running(self):
+        running_states = ["RUNNING", "RESIZING"]
+        for state in running_states:
+            cluster_state = ClusterState(state, "")
+            assert cluster_state.is_running
+
+    def test_to_json(self):
+        cluster_state = ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
+        expected = json.dumps(GET_CLUSTER_RESPONSE)
+        assert expected == cluster_state.to_json()
+
+    def test_from_json(self):
+        state = GET_CLUSTER_RESPONSE
+        expected = ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
+        assert expected == ClusterState.from_json(json.dumps(state))
 
 
 def create_aad_token_for_resource(resource: str) -> dict:
@@ -1308,6 +1345,23 @@ class TestDatabricksHookAsyncMethods:
         mock_get.assert_called_once_with(
             get_run_endpoint(HOST),
             json={"run_id": RUN_ID},
+            auth=aiohttp.BasicAuth(LOGIN, PASSWORD),
+            headers=self.hook.user_agent_header,
+            timeout=self.hook.timeout_seconds,
+        )
+
+    @pytest.mark.asyncio
+    @mock.patch("airflow.providers.databricks.hooks.databricks_base.aiohttp.ClientSession.get")
+    async def test_get_cluster_state(self, mock_get):
+        mock_get.return_value.__aenter__.return_value.json = AsyncMock(return_value=GET_CLUSTER_RESPONSE)
+
+        async with self.hook:
+            cluster_state = await self.hook.async_get_cluster_state(CLUSTER_ID)
+
+        assert cluster_state == ClusterState(CLUSTER_STATE, CLUSTER_STATE_MESSAGE)
+        mock_get.assert_called_once_with(
+            get_cluster_endpoint(HOST),
+            json={"cluster_id": CLUSTER_ID},
             auth=aiohttp.BasicAuth(LOGIN, PASSWORD),
             headers=self.hook.user_agent_header,
             timeout=self.hook.timeout_seconds,
