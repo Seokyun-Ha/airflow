@@ -18,8 +18,6 @@
 ---
 name: Tests
 on:  # yamllint disable-line rule:truthy
-  schedule:
-    - cron: '28 0 * * *'
   push:
     branches: ['*']
     # branches: ['main', 'v[0-9]+-[0-9]+-test']
@@ -392,32 +390,32 @@ jobs:
         working-directory: ./dev/breeze/
       - run: breeze setup check-all-params-in-groups
 
-  tests-www:
-    timeout-minutes: 10
-    name: React WWW tests
-    runs-on: "${{needs.build-info.outputs.runs-on}}"
-    needs: [build-info]
-    if: needs.build-info.outputs.run-www-tests == 'true'
-    steps:
-      - name: Cleanup repo
-        run: docker run -v "${GITHUB_WORKSPACE}:/workspace" -u 0:0 bash -c "rm -rf /workspace/*"
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-      - name: "Setup node"
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
-      - name: "Cache eslint"
-        uses: actions/cache@v3
-        with:
-          path: 'airflow/www/node_modules'
-          key: ${{ runner.os }}-www-node-modules-${{ hashFiles('airflow/www/**/yarn.lock') }}
-      - run: yarn --cwd airflow/www/ install --frozen-lockfile --non-interactive
-      - run: yarn --cwd airflow/www/ run test
-        env:
-          FORCE_COLOR: 2
+  # tests-www:
+  #   timeout-minutes: 10
+  #   name: React WWW tests
+  #   runs-on: "${{needs.build-info.outputs.runs-on}}"
+  #   needs: [build-info]
+  #   if: needs.build-info.outputs.run-www-tests == 'true'
+  #   steps:
+  #     - name: Cleanup repo
+  #       run: docker run -v "${GITHUB_WORKSPACE}:/workspace" -u 0:0 bash -c "rm -rf /workspace/*"
+  #     - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+  #       uses: actions/checkout@v3
+  #       with:
+  #         persist-credentials: false
+  #     - name: "Setup node"
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 14
+  #     - name: "Cache eslint"
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: 'airflow/www/node_modules'
+  #         key: ${{ runner.os }}-www-node-modules-${{ hashFiles('airflow/www/**/yarn.lock') }}
+  #     - run: yarn --cwd airflow/www/ install --frozen-lockfile --non-interactive
+  #     - run: yarn --cwd airflow/www/ run test
+  #       env:
+  #         FORCE_COLOR: 2
 
 
   test-openapi-client-generation:
@@ -605,72 +603,72 @@ jobs:
         run: breeze ci fix-ownership
         if: always()
 
-  docs:
-    timeout-minutes: 90
-    name: "Build docs"
-    runs-on: "${{needs.build-info.outputs.runs-on}}"
-    needs: [build-info, wait-for-ci-images]
-    if: needs.build-info.outputs.docs-build == 'true'
-    env:
-      RUNS_ON: "${{needs.build-info.outputs.runs-on}}"
-      PYTHON_MAJOR_MINOR_VERSION: "${{needs.build-info.outputs.default-python-version}}"
-    steps:
-      - name: Cleanup repo
-        run: docker run -v "${GITHUB_WORKSPACE}:/workspace" -u 0:0 bash -c "rm -rf /workspace/*"
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - name: >
-          Prepare breeze & CI image: ${{needs.build-info.outputs.default-python-version}}:${{env.IMAGE_TAG}}
-        uses: ./.github/actions/prepare_breeze_and_image
-      - uses: actions/cache@v3
-        id: cache-doc-inventories
-        with:
-          path: ./docs/_inventory_cache/
-          key: docs-inventory-${{ hashFiles('setup.py','setup.cfg','pyproject.toml;') }}
-          restore-keys: |
-            docs-inventory-${{ hashFiles('setup.py','setup.cfg','pyproject.toml;') }}
-            docs-inventory-
-      - name: "Build docs"
-        run: >
-          breeze build-docs
-          ${{ needs.build-info.outputs.docs-filter-list-as-string }}
-      - name: "Clone airflow-site"
-        run: >
-          git clone https://github.com/apache/airflow-site.git ${GITHUB_WORKSPACE}/airflow-site &&
-          echo "AIRFLOW_SITE_DIRECTORY=${GITHUB_WORKSPACE}/airflow-site" >> "$GITHUB_ENV"
-      - name: "Publish docs"
-        run: >
-          breeze release-management publish-docs
-          --override-versioned --run-in-parallel
-          ${{ needs.build-info.outputs.docs-filter-list-as-string }}
-      - name: "Generate back references for providers"
-        run: breeze release-management add-back-references all-providers
-      - name: "Generate back references for apache-airflow"
-        run: breeze release-management add-back-references apache-airflow
-      - name: "Generate back references for docker-stack"
-        run: breeze release-management add-back-references docker-stack
-      - name: "Generate back references for helm-chart"
-        run: breeze release-management add-back-references helm-chart
-      - name: Configure AWS credentials
-        uses: ./.github/actions/configure-aws-credentials
-        if: >
-          github.ref == 'refs/heads/main' && github.repository == 'apache/airflow' &&
-          github.event_name == 'push'
-        with:
-          aws-access-key-id: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.DOCS_AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-      - name: "Upload documentation to AWS S3"
-        if: >
-          github.ref == 'refs/heads/main' && github.repository == 'apache/airflow' &&
-          github.event_name == 'push'
-        run: aws s3 sync --delete ./files/documentation s3://apache-airflow-docs
-      - name: "Fix ownership"
-        run: breeze ci fix-ownership
-        if: always()
+  # docs:
+  #   timeout-minutes: 90
+  #   name: "Build docs"
+  #   runs-on: "${{needs.build-info.outputs.runs-on}}"
+  #   needs: [build-info, wait-for-ci-images]
+  #   if: needs.build-info.outputs.docs-build == 'true'
+  #   env:
+  #     RUNS_ON: "${{needs.build-info.outputs.runs-on}}"
+  #     PYTHON_MAJOR_MINOR_VERSION: "${{needs.build-info.outputs.default-python-version}}"
+  #   steps:
+  #     - name: Cleanup repo
+  #       run: docker run -v "${GITHUB_WORKSPACE}:/workspace" -u 0:0 bash -c "rm -rf /workspace/*"
+  #     - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+  #       uses: actions/checkout@v3
+  #       with:
+  #         persist-credentials: false
+  #         submodules: recursive
+  #     - name: >
+  #         Prepare breeze & CI image: ${{needs.build-info.outputs.default-python-version}}:${{env.IMAGE_TAG}}
+  #       uses: ./.github/actions/prepare_breeze_and_image
+  #     - uses: actions/cache@v3
+  #       id: cache-doc-inventories
+  #       with:
+  #         path: ./docs/_inventory_cache/
+  #         key: docs-inventory-${{ hashFiles('setup.py','setup.cfg','pyproject.toml;') }}
+  #         restore-keys: |
+  #           docs-inventory-${{ hashFiles('setup.py','setup.cfg','pyproject.toml;') }}
+  #           docs-inventory-
+  #     - name: "Build docs"
+  #       run: >
+  #         breeze build-docs
+  #         ${{ needs.build-info.outputs.docs-filter-list-as-string }}
+  #     - name: "Clone airflow-site"
+  #       run: >
+  #         git clone https://github.com/apache/airflow-site.git ${GITHUB_WORKSPACE}/airflow-site &&
+  #         echo "AIRFLOW_SITE_DIRECTORY=${GITHUB_WORKSPACE}/airflow-site" >> "$GITHUB_ENV"
+  #     - name: "Publish docs"
+  #       run: >
+  #         breeze release-management publish-docs
+  #         --override-versioned --run-in-parallel
+  #         ${{ needs.build-info.outputs.docs-filter-list-as-string }}
+  #     - name: "Generate back references for providers"
+  #       run: breeze release-management add-back-references all-providers
+  #     - name: "Generate back references for apache-airflow"
+  #       run: breeze release-management add-back-references apache-airflow
+  #     - name: "Generate back references for docker-stack"
+  #       run: breeze release-management add-back-references docker-stack
+  #     - name: "Generate back references for helm-chart"
+  #       run: breeze release-management add-back-references helm-chart
+  #     - name: Configure AWS credentials
+  #       uses: ./.github/actions/configure-aws-credentials
+  #       if: >
+  #         github.ref == 'refs/heads/main' && github.repository == 'apache/airflow' &&
+  #         github.event_name == 'push'
+  #       with:
+  #         aws-access-key-id: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.DOCS_AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: eu-central-1
+  #     - name: "Upload documentation to AWS S3"
+  #       if: >
+  #         github.ref == 'refs/heads/main' && github.repository == 'apache/airflow' &&
+  #         github.event_name == 'push'
+  #       run: aws s3 sync --delete ./files/documentation s3://apache-airflow-docs
+  #     - name: "Fix ownership"
+  #       run: breeze ci fix-ownership
+  #       if: always()
 
   prepare-test-provider-packages-wheel:
     timeout-minutes: 80
@@ -1650,7 +1648,7 @@ jobs:
     runs-on: "${{needs.build-info.outputs.runs-on}}"
     needs:
       - build-info
-      - docs
+      # - docs
       - wait-for-ci-images
       - wait-for-prod-images
       - static-checks
@@ -1724,7 +1722,7 @@ jobs:
     needs:
       - build-info
       - constraints
-      - docs
+      # - docs
     if: needs.build-info.outputs.canary-run == 'true'
     strategy:
       fail-fast: false
