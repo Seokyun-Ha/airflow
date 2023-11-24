@@ -26,13 +26,13 @@ if TYPE_CHECKING:
     from airflow.utils.context import Context
 
 
-class DatabrickClusterSensor(BaseSensorOperator):
+class DatabricksClusterSensor(BaseSensorOperator):
     """
     Waits for a Redshift cluster to reach a specific status.
 
     .. seealso::
         For more information on how to use this sensor, take a look at the guide:
-        :ref:`howto/sensor:DatabrickClusterSensor`
+        :ref:`howto/sensor:DatabricksClusterSensor`
 
     :param cluster_id: The identifier for the cluster being pinged.
     :param target_state: The cluster status desired.
